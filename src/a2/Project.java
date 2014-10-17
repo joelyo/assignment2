@@ -128,10 +128,14 @@ public class Project {
 	 */
 	public void deallocateAll() {
 		for (Map.Entry<Donation, Integer> entry : allocations.entrySet()) {
-			this.deallocate(entry.getKey(), entry.getValue());
+			Donation d = entry.getKey();
+			int amount = entry.getValue();
+			d.unspend(amount);
+			allocatedFunding -= amount;
 		}
+		allocations.clear();
 	}
-
+	
 	private void removeFromAllocations(Donation donation, int amount) {
 		int existingAmount = allocations.get(donation);
 		if (existingAmount > amount) {
