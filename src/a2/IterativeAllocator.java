@@ -21,14 +21,17 @@ public class IterativeAllocator {
 	public static boolean canAllocate(List<Donation> donations,
 			Set<Project> projects) {
 		Set<List<Project>> paths = paths(donations, projects);
-//		while (checkValidPaths(paths, donations)) {
-			for (List<Project> path : paths) {
-				if (checkProperties(path.get(path.size()-1).neededFunds(), path, donations)) {
-					allocateDonations(path.get(path.size()-1).neededFunds(), path, donations);
+		while (checkValidPaths(paths, donations)) {
+			for (Donation d : donations) {
+				for (List<Project> path : paths) {
+					if (checkProperties(Math.min(path.get(path.size()-1).neededFunds(), d.getUnspent()), path, donations)) {
+						allocateDonations(Math.min(path.get(path.size()-1).neededFunds(), d.getUnspent()), path, donations);
+					}
 				}
 			}
-//		}
-		errorTest(projects);
+			errorTest(projects);
+		}
+		
 		if (allAllocated(projects)) {
 			return true;
 		}
@@ -37,11 +40,11 @@ public class IterativeAllocator {
 	}
 	
 	/**
-	 * check properties of path
+	 * checks if a positive integer x and a path of n>0 distinct projects path satisfies properties (1)-(3)
 	 */
 	private static boolean checkProperties(int x, List<Project> path, List<Donation> donations) {
 		// check that project path[n-1] is currently underfunded by at least x dollars
-		if (path.get(path.size()-1).neededFunds() < x) {
+		if (path.get(path.size()-1).neededFunds() < x || x <= 0) {
 			return false;
 		}
 		
@@ -58,15 +61,12 @@ public class IterativeAllocator {
 		
 		// check that for each i=n-2 to 0, x dollars from project path[i] could be transferred to project path[i+1]
 		if (path.size() > 1) {
-			for (int i = path.size()-2; i > 0; i--) {
-				Iterator<Map.Entry<Donation, Integer>> it = path.get(i).getAllocations()
-						.entrySet().iterator();
-				Map.Entry<Donation, Integer> entry;
+			for (int i = path.size()-2; i >= 0; i--) {
+				Set<Map.Entry<Donation, Integer>> it = path.get(i).getAllocations().entrySet();
 				int amount = 0;
-				while (it.hasNext()) {
-					entry = it.next();
+				for (Map.Entry<Donation, Integer> entry : it) {
 					if (entry.getKey().canBeUsedFor(path.get(i+1))) {
-						amount = entry.getValue();
+						amount = amount + entry.getValue();
 					}
 				}
 				if (amount < x) {
@@ -83,12 +83,12 @@ public class IterativeAllocator {
 	 */
 	private static void allocateDonations(int x, List<Project> path, List<Donation> donations) {
 		if (path.size() > 1) {
-			for (int i=path.size()-2; i > 0; i--) {
+			for (int i=path.size()-2; i >= 0; i--) {
 				path.get(i+1).transfer(x, path.get(i));
 			}
 		}
 		for (Donation d : donations) {
-			if (d.canBeUsedFor(path.get(0))) {
+			if (d.canBeUsedFor(path.get(0)) && x != 0) {
 				int available = d.getUnspent();
 				path.get(0).allocate(d, Math.min(x, available));
 				x = x - Math.min(x, available);
@@ -97,13 +97,15 @@ public class IterativeAllocator {
 	}
 	
 	/**
-	 * check all paths in the set are valid
+	 * check to see if there is still a positive integer x and a path of n>0 distinct projects path satisfying properties (1)-(3)
 	 */
 	private static boolean checkValidPaths(Set<List<Project>> paths, List<Donation> donations) {
 		boolean check = false;
-		for (List<Project> p : paths) {
-			if (checkProperties(p.get(p.size()-1).neededFunds(), p, donations)) {
-				check = true;
+		for (Donation d : donations) {
+			for (List<Project> path : paths) {
+				if (checkProperties(Math.min(path.get(path.size()-1).neededFunds(), d.getUnspent()), path, donations)) {
+					check = true;
+				}
 			}
 		}
 		return check;
@@ -136,10 +138,15 @@ public class IterativeAllocator {
 	 */
 	private static void errorTest(Set<Project> projects) {
 		for (Project p : projects) {
+			System.out.println(p.getName());
 			System.out.println(p.getAllocations());
 		}
+		System.out.println();
 	}
 	
+	/**
+	 * returns a map that represents a graph of the given projects
+	 */
 	private static Map<Project, Set<Project>> graph(List<Donation> donations, Set<Project> projects) {
 		Map<Project, Set<Project>> map = new HashMap<Project, Set<Project>>();
 		for (Project p1 : projects) {
@@ -157,6 +164,9 @@ public class IterativeAllocator {
 		return map;
 	}
 	
+	/**
+	 * returns a map to track whether each node has been visited
+	 */
 	private static Map<Project, Integer> visited(Set<Project> projects, Project project) {
 		Map<Project, Integer> map = new HashMap<Project, Integer>();
 		for (Project p : projects) {
@@ -168,6 +178,9 @@ public class IterativeAllocator {
 		return map;
 	}
 	
+	/**
+	 * returns a set containing paths that can be traversed in the graph
+	 */
 	private static Set<List<Project>> paths(List<Donation> donations, Set<Project> projects) {
 		Set<List<Project>> paths = new HashSet<List<Project>>();
 		Map<Project, Set<Project>> map = graph(donations, projects);
@@ -178,6 +191,10 @@ public class IterativeAllocator {
 		return paths;
 	}
 	
+	
+	/**
+	 * expand the given set of paths to include it's sub-paths
+	 */
 	private static void subPaths(Set<List<Project>> paths) {
 		Set<List<Project>> tempPaths = new HashSet<List<Project>>();
 		for (List<Project> p : paths) {
@@ -190,6 +207,9 @@ public class IterativeAllocator {
 		}
 	}
 	
+	/**
+	 * return a path traversal of a graph of projects starting at the given node using depth-first search
+	 */
 	private static List<Project> dfs(Map<Project, Set<Project>> map, Project project, Map<Project, Integer> visited) {
 		List<Project> list = new ArrayList<Project>();
 		Set<Project> edges = map.get(project);
