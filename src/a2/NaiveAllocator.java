@@ -43,10 +43,8 @@ public class NaiveAllocator {
 		// check if the projects the donation could be spent on are completely allocated
 		boolean donationProjectsComplete = true;
 		for (Project p: projects) {
-			if (donation.canBeUsedFor(p)) {
-				if(!p.fullyFunded()) {
-					donationProjectsComplete = false;
-				} 
+			if (donation.canBeUsedFor(p) && !p.fullyFunded()) {
+				donationProjectsComplete = false; 
 			}
 		}
 		if (donation.spent() || donationProjectsComplete) {
@@ -54,14 +52,12 @@ public class NaiveAllocator {
 		}
 		// allocate one dollar for each project that donation could be spent on that still needs funding
 		for (Project p : projects) {
-			if (donation.canBeUsedFor(p)) {
-				if (!p.fullyFunded()) {
-					p.allocate(donation, 1);
-					if (canAllocateHelper(donations, projects, i)) {
-						return true;
-					} else {
-						p.deallocate(donation, 1);
-					}
+			if (donation.canBeUsedFor(p) && !p.fullyFunded()) {
+				p.allocate(donation, 1);
+				if (canAllocateHelper(donations, projects, i)) {
+					return true;
+				} else {
+					p.deallocate(donation, 1);
 				}
 			}
 		}
